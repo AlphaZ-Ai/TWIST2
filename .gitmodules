@@ -1,0 +1,6 @@
+[submodule "deploy_real/robot_control/deploy_real/robot_control/dex-retargeting"]
+	path = deploy_real/robot_control/deploy_real/robot_control/dex-retargeting
+	url = https://github.com/dexsuite/dex-retargeting.git
+[submodule "deploy_real/robot_control/dex-retargeting"]
+	path = deploy_real/robot_control/dex-retargeting
+	url = https://github.com/dexsuite/dex-retargeting.git
