@@ -1,3 +1,8 @@
+#!/bin/bash
+
+# Set LD_LIBRARY_PATH to include conda environment lib directory
+export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+
 SCRIPT_DIR=$(dirname $(realpath $0))
 ckpt_path=${SCRIPT_DIR}/assets/ckpts/twist2_1017_20k.onnx
 

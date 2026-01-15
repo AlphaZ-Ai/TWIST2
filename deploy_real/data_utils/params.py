@@ -150,4 +150,42 @@ DEFAULT_HAND_POSE = {
             "close": np.array([0, 0]), # parallel gripper
         },
     },
+    "unitree_g1_rh56dfq":
+    {
+        "left": {
+            "open": np.array([0, 0, 0, 0, 0, 0]),
+            "close": np.array([
+                # left hand (6 motors: thumb, index, middle, ring, pinky, palm)
+                1.2, 1.5, 1.5, 1.5, 1.5, 0.5
+            ]),
+            "pinch": np.array([
+                # Precision pinch with thumb and index
+                1.0, 1.2, 0.2, 0.2, 0.2, 0.3
+            ])
+        },
+        "right": {
+            "open": np.array([0, 0, 0, 0, 0, 0]),
+            "close": np.array([
+                # right hand (6 motors: thumb, index, middle, ring, pinky, palm)
+                1.2, 1.5, 1.5, 1.5, 1.5, 0.5
+            ]),
+            "pinch": np.array([
+                # Precision pinch with thumb and index
+                1.0, 1.2, 0.2, 0.2, 0.2, 0.3
+            ])
+        },
+    },
+    "unitree_g1_inspire":  # Inspire parallel gripper (1-DOF per gripper)
+    {
+        "left": {
+            "open": np.array([0.0]),      # 0.0 = fully open
+            "close": np.array([0.85]),    # 0.85 rad = ~48.7 degrees = fully closed
+            "half": np.array([0.4])       # Intermediate position for gentle grip
+        },
+        "right": {
+            "open": np.array([0.0]),      # 0.0 = fully open  
+            "close": np.array([0.85]),    # 0.85 rad = ~48.7 degrees = fully closed
+            "half": np.array([0.4])       # Intermediate position for gentle grip
+        },
+    },
 }
