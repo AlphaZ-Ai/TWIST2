@@ -81,7 +81,7 @@ class Inspire_Hand_Controller:
     
     def initialize(self):
         """Initialize hands with default poses"""
-        print("🔧 Initializing Inspire hands with default (open) poses...")
+        print("Initializing Inspire hands with default (open) poses...")
         self.ctrl_dual_hand(DEFAULT_QPOS_LEFT, DEFAULT_QPOS_RIGHT)
     
     def close(self):

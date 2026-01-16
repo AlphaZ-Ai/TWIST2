@@ -16,4 +16,3 @@ python server_low_level_g1_sim.py \
     --measure_fps 1 \
     --policy_frequency 100 \
     --limit_fps 1 \
-    # --record_proprio \
