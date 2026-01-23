@@ -90,7 +90,9 @@ class RealTimePolicyController:
         self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_COM] = 0
         self.viewer.cam.distance = 2.0
 
-        self.num_actions = 29
+        self.num_actions = 29  # Body DOF only (hands handled separately via hand retargeting)
+        self.num_hand_dof = 24  # Hand DOF (left 12 + right 12) in qpos
+        self.total_dof = 53  # Total actuators in MuJoCo model
         self.sim_duration = 100000.0
         self.sim_dt = 0.001
         # real frequency = 1 / (decimation * sim_dt)
@@ -117,40 +119,53 @@ class RealTimePolicyController:
                 0.0, 0.0, 0.0, # torso (3)
                 0.0, 0.2, 0.0, 1.2, 0.0, 0.0, 0.0, # left arm (7)
                 0.0, -0.2, 0.0, 1.2, 0.0, 0.0, 0.0, # right arm (7)
-                ])
+                ]),
+            np.zeros(24)  # hand joints all open/zero (60 total - 36 existing)
         ])
 
-        self.stiffness = np.array([
+        self.stiffness = np.concatenate([
+            np.array([
                 100, 100, 100, 150, 40, 40,
                 100, 100, 100, 150, 40, 40,
                 150, 150, 150,
                 40, 40, 40, 40, 4.0, 4.0, 4.0,
                 40, 40, 40, 40, 4.0, 4.0, 4.0,
-            ])
-        self.damping = np.array([
+            ]),
+            np.zeros(24)  # Hand stiffness (controlled via hand retargeting)
+        ])
+        self.damping = np.concatenate([
+            np.array([
                 2, 2, 2, 4, 2, 2,
                 2, 2, 2, 4, 2, 2,
                 4, 4, 4,
                 5, 5, 5, 5, 0.2, 0.2, 0.2,
                 5, 5, 5, 5, 0.2, 0.2, 0.2,
-            ])
+            ]),
+            np.zeros(24)  # Hand damping
+        ])
 
         
-        self.torque_limits = np.array([
+        self.torque_limits = np.concatenate([
+            np.array([
                 100, 100, 100, 150, 40, 40,
                 100, 100, 100, 150, 40, 40,
                 150, 150, 150,
                 40, 40, 40, 40, 4.0, 4.0, 4.0,
                 40, 40, 40, 40, 4.0, 4.0, 4.0,
-            ])
+            ]),
+            np.ones(24) * 30.0  # Hand joint limits
+        ])
 
-        self.action_scale = np.array([
+        self.action_scale = np.concatenate([
+            np.array([
                 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
                 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
                 0.5, 0.5, 0.5,
                 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
                 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
-            ])
+            ]),
+            np.ones(24)  # Hand action scale
+        ])
 
         self.ankle_idx = [4, 5, 10, 11]
 
@@ -363,9 +378,16 @@ class RealTimePolicyController:
                         self.proprio_recordings.append(proprio_data)
 
                
-                # PD control
-                torque = (pd_target - dof_pos) * self.stiffness - dof_vel * self.damping
-                torque = np.clip(torque, -self.torque_limits, self.torque_limits)
+                # PD control for body (29 DOF) and hands (24 DOF passive)
+                # Policy controls 29 DOF, hand joints remain passive
+                torque = np.zeros(self.total_dof)  # 53 actuators total
+                
+                # Apply PD control to body DOF (first 29 actuators)
+                body_torque = (pd_target[:self.num_actions] - dof_pos[:self.num_actions]) * self.stiffness[:self.num_actions] - dof_vel[:self.num_actions] * self.damping[:self.num_actions]
+                body_torque = np.clip(body_torque, -self.torque_limits[:self.num_actions], self.torque_limits[:self.num_actions])
+                torque[:self.num_actions] = body_torque
+                
+                # Hand joints (29:53) remain passive (torque = 0)
                 
                 self.data.ctrl[:] = torque
                 mujoco.mj_step(self.model, self.data)

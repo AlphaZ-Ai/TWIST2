@@ -8,6 +8,8 @@ logger_mp = logging_mp.get_logger(__name__)
 class HandType(Enum):
     INSPIRE_HAND = "../assets/inspire_hand/inspire_hand.yml"
     INSPIRE_HAND_Unit_Test = "../../assets/inspire_hand/inspire_hand.yml"
+    INSPIRE_GRIPPER = "../assets/inspire_gripper/inspire_gripper.yml"
+    INSPIRE_GRIPPER_Unit_Test = "../../assets/inspire_gripper/inspire_gripper.yml"
     UNITREE_DEX3 = "../assets/unitree_hand/unitree_dex3.yml"
     UNITREE_DEX3_Unit_Test = "../../assets/unitree_hand/unitree_dex3.yml"
     BRAINCO_HAND = "../assets/brainco_hand/brainco.yml"
@@ -22,6 +24,10 @@ class HandRetargeting:
         elif hand_type == HandType.INSPIRE_HAND:
             RetargetingConfig.set_default_urdf_dir('../assets')
         elif hand_type == HandType.INSPIRE_HAND_Unit_Test:
+            RetargetingConfig.set_default_urdf_dir('../../assets')
+        elif hand_type == HandType.INSPIRE_GRIPPER:
+            RetargetingConfig.set_default_urdf_dir('../assets')
+        elif hand_type == HandType.INSPIRE_GRIPPER_Unit_Test:
             RetargetingConfig.set_default_urdf_dir('../../assets')
         elif hand_type == HandType.BRAINCO_HAND:
             RetargetingConfig.set_default_urdf_dir('../assets')
@@ -66,6 +72,14 @@ class HandRetargeting:
                                                        'R_index_proximal_joint', 'R_thumb_proximal_pitch_joint', 'R_thumb_proximal_yaw_joint' ]
                 self.left_dex_retargeting_to_hardware = [ self.left_retargeting_joint_names.index(name) for name in self.left_inspire_api_joint_names]
                 self.right_dex_retargeting_to_hardware = [ self.right_retargeting_joint_names.index(name) for name in self.right_inspire_api_joint_names]
+            
+            elif hand_type == HandType.INSPIRE_GRIPPER or hand_type == HandType.INSPIRE_GRIPPER_Unit_Test:
+                # Simple 1-DOF parallel gripper
+                # Joint names should match what's in the URDF
+                self.left_gripper_joint_names = [ 'left_gripper_joint' ]
+                self.right_gripper_joint_names = [ 'right_gripper_joint' ]
+                self.left_dex_retargeting_to_hardware = [ self.left_retargeting_joint_names.index(name) for name in self.left_gripper_joint_names]
+                self.right_dex_retargeting_to_hardware = [ self.right_retargeting_joint_names.index(name) for name in self.right_gripper_joint_names]
         except FileNotFoundError:
             logger_mp.warning(f"Configuration file not found: {config_file_path}")
             raise

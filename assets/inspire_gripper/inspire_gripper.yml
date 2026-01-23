@@ -1,0 +1,57 @@
+left:
+  type: vector
+  # This config is for the Inspire parallel gripper (1-DOF) 
+  # NOT the Inspire Hand (6-DOF). See inspire_hands/ for the dexterous hand.
+  # Note: For simulation with g1_sim2sim_29dof_with_grippers.xml, 
+  # the gripper is defined geometrically in the XML (no separate URDF needed)
+  urdf_path: inspire_gripper/inspire_gripper_left.urdf
+
+  # Target refers to the retargeting target, which is the robot gripper
+  # For a 1-DOF parallel gripper, we only have one actuated joint
+  # Joint name matches g1_sim2sim_29dof_with_grippers.xml
+  target_joint_names: [ "left_gripper_joint" ]
+  
+  # Vector retargeting: map from origin link to task link
+  # This creates a "pinch vector" from base to moving finger
+  target_origin_link_names: [ "left_gripper_base" ]
+  target_task_link_names: [ "left_gripper_finger2" ]
+  
+  # Source refers to the retargeting input (human hand)
+  # Map thumb tip (index 4) to index finger tip (index 8)
+  # This means: close gripper when human pinches thumb and index finger together
+  target_link_human_indices: [ [ 4 ], [ 8 ] ]
+  
+  # Scaling factor - adjust based on gripper size vs human hand
+  # 1.0 = same size, >1.0 = gripper larger than hand, <1.0 = gripper smaller
+  scaling_factor: 1.2
+  
+  # Low pass filter for smoothing
+  # Smaller alpha = more filtering (smoother but more latency)
+  # 0.2 is conservative for responsive but stable control
+  low_pass_alpha: 0.2
+
+right:
+  type: vector
+  # This config is for the Inspire parallel gripper (1-DOF) 
+  # NOT the Inspire Hand (6-DOF). See inspire_hands/ for the dexterous hand.
+  # Note: For simulation with g1_sim2sim_29dof_with_grippers.xml, 
+  # the gripper is defined geometrically in the XML (no separate URDF needed)
+  urdf_path: inspire_gripper/inspire_gripper_right.urdf
+
+  # Target refers to the retargeting target, which is the robot gripper
+  # Joint name matches g1_sim2sim_29dof_with_grippers.xml
+  target_joint_names: [ "right_gripper_joint" ]
+  
+  # Vector retargeting: map from origin link to task link
+  target_origin_link_names: [ "right_gripper_base" ]
+  target_task_link_names: [ "right_gripper_finger2" ]
+  
+  # Source refers to the retargeting input (human hand)
+  # Map thumb tip (index 4) to index finger tip (index 8)
+  target_link_human_indices: [ [ 4 ], [ 8 ] ]
+  
+  # Scaling factor
+  scaling_factor: 1.2
+  
+  # Low pass filter
+  low_pass_alpha: 0.2
