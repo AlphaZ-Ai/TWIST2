@@ -17,6 +17,13 @@ from data_utils.rot_utils import quatToEuler
 from robot_control.dex_hand_wrapper import Dex3_1_Controller
 
 try:
+    from robot_control.inspire_hand_wrapper import Inspire_Controller_FTP
+    FTP_AVAILABLE = True
+except ImportError:
+    FTP_AVAILABLE = False
+    print("[WARNING] Inspire FTP controller not available")
+
+try:
     import onnxruntime as ort
 except ImportError:
     ort = None
@@ -100,6 +107,7 @@ class RealTimePolicyController(object):
                  device='cuda',
                  net='eno1',
                  use_hand=False,
+                 hand_type='dex3',
                  record_proprio=False,
                  smooth_body=0.0):
         self.redis_client = None
@@ -113,8 +121,37 @@ class RealTimePolicyController(object):
         self.config = Config(config_path)
         self.env = G1RealWorldEnv(net=net, config=self.config)
         self.use_hand = use_hand
+        self.hand_type = hand_type
+        
         if use_hand:
-            self.hand_ctrl = Dex3_1_Controller(net, re_init=False)
+            if hand_type == 'ftp' and FTP_AVAILABLE:
+                print("Using Inspire FTP hand controller (6 DOF per hand)")
+                # FTP controller needs shared arrays for hand data
+                from multiprocessing import Array, Lock
+                self.left_hand_array = Array('d', 26 * 3)  # 26 joints * 3 coords
+                self.right_hand_array = Array('d', 26 * 3)
+                self.dual_hand_data_lock = Lock()
+                self.dual_hand_state_array = Array('d', 12)  # 6 left + 6 right
+                self.dual_hand_action_array = Array('d', 12)
+                # Use controller mode since we're sending direct position commands
+                self.left_gripper_value = Array('d', 1)
+                self.right_gripper_value = Array('d', 1)
+                self.hand_ctrl = Inspire_Controller_FTP(
+                    self.left_hand_array, 
+                    self.right_hand_array,
+                    dual_hand_data_lock=self.dual_hand_data_lock,
+                    dual_hand_state_array=self.dual_hand_state_array,
+                    dual_hand_action_array=self.dual_hand_action_array,
+                    fps=100.0,
+                    controller_mode=True,  # Use position commands
+                    left_gripper_value=self.left_gripper_value,
+                    right_gripper_value=self.right_gripper_value
+                )
+            else:
+                if hand_type == 'ftp' and not FTP_AVAILABLE:
+                    print("[WARNING] FTP controller not available, falling back to Dex3")
+                print("Using Dex3 hand controller (7 DOF per hand)")
+                self.hand_ctrl = Dex3_1_Controller(net, re_init=False)
 
         self.device = device
         self.policy = load_onnx_policy(policy_path, device)
@@ -229,27 +266,46 @@ class RealTimePolicyController(object):
                 self.redis_pipeline.execute()
 
                 # 5. 从 Redis 接收模仿观察
-                keys = ["action_body_unitree_g1_with_hands", "action_hand_left_unitree_g1_with_hands", "action_hand_right_unitree_g1_with_hands", "action_neck_unitree_g1_with_hands"]
+                # Get body and neck actions
+                keys = ["action_body_unitree_g1_with_hands", "action_neck_unitree_g1_with_hands"]
                 for key in keys:
                     self.redis_pipeline.get(key)
                 redis_results = self.redis_pipeline.execute()
                 action_mimic = json.loads(redis_results[0])
-                action_hand_left = json.loads(redis_results[1])
-                action_hand_right = json.loads(redis_results[2])
-                action_neck = json.loads(redis_results[3])
+                action_neck = json.loads(redis_results[1])
+                
+                # Get hand actions based on hand type
+                if self.use_hand:
+                    if self.hand_type == 'ftp':
+                        # FTP hands use 6 DOF per hand
+                        hand_keys = ["action_ftp_left", "action_ftp_right"]
+                        for key in hand_keys:
+                            self.redis_pipeline.get(key)
+                        hand_results = self.redis_pipeline.execute()
+                        try:
+                            left_data = json.loads(hand_results[0]) if hand_results[0] else None
+                            right_data = json.loads(hand_results[1]) if hand_results[1] else None
+                            action_hand_left = np.array(left_data, dtype=np.float32) if left_data else np.zeros(6, dtype=np.float32)
+                            action_hand_right = np.array(right_data, dtype=np.float32) if right_data else np.zeros(6, dtype=np.float32)
+                        except (json.JSONDecodeError, TypeError):
+                            action_hand_left = np.zeros(6, dtype=np.float32)
+                            action_hand_right = np.zeros(6, dtype=np.float32)
+                    else:
+                        # Dex3 hands use 7 DOF per hand
+                        hand_keys = ["action_hand_left_unitree_g1_with_hands", "action_hand_right_unitree_g1_with_hands"]
+                        for key in hand_keys:
+                            self.redis_pipeline.get(key)
+                        hand_results = self.redis_pipeline.execute()
+                        action_hand_left = np.array(json.loads(hand_results[0]), dtype=np.float32)
+                        action_hand_right = np.array(json.loads(hand_results[1]), dtype=np.float32)
+                else:
+                    action_hand_left = np.zeros(7, dtype=np.float32)
+                    action_hand_right = np.zeros(7, dtype=np.float32)
                 
                 # Apply smoothing to body actions if enabled
                 if self.body_smoother is not None:
                     action_mimic = self.body_smoother.smooth(np.array(action_mimic, dtype=np.float32))
                     action_mimic = action_mimic.tolist()
-            
-                
-                if self.use_hand:
-                    action_hand_left = np.array(action_hand_left, dtype=np.float32)
-                    action_hand_right = np.array(action_hand_right, dtype=np.float32)
-                else:
-                    action_hand_left = np.zeros(7, dtype=np.float32)
-                    action_hand_right = np.zeros(7, dtype=np.float32)
 
                 obs_full = np.concatenate([action_mimic, obs_proprio])
                 
@@ -334,6 +390,8 @@ def main():
                         help='Network interface for robot communication')
     parser.add_argument('--use_hand', action='store_true',
                         help='Enable hand control')
+    parser.add_argument('--hand_type', type=str, default='dex3', choices=['dex3', 'ftp'],
+                        help='Type of hand controller (dex3=7DOF Dex3, ftp=6DOF Inspire FTP)')
     parser.add_argument('--record_proprio', action='store_true',
                         help='Record proprioceptive data')
     parser.add_argument('--smooth_body', type=float, default=0.0,
@@ -357,6 +415,7 @@ def main():
     print(f"  Device: {args.device}")
     print(f"  Network interface: {args.net}")
     print(f"  Use hand: {args.use_hand}")
+    print(f"  Hand type: {args.hand_type}")
     print(f"  Record proprio: {args.record_proprio}")
     print(f"  Smooth body: {args.smooth_body}")
     
@@ -375,6 +434,7 @@ def main():
         device=args.device,
         net=args.net,
         use_hand=args.use_hand,
+        hand_type=args.hand_type,
         record_proprio=args.record_proprio,
         smooth_body=args.smooth_body,
     )

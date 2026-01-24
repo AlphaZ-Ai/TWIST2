@@ -1,0 +1,64 @@
+# Inspire FTP Gripper - Left Hand dex-retargeting configuration
+# 
+# This config file defines the retargeting from human hand (MANO/XRobot) 
+# to the Inspire FTP gripper using vector optimization.
+
+retargeting_type: vector  # Position-based retargeting
+
+urdf_path: inspire_ftp_left.urdf
+
+# Joint names in the URDF that are actuated
+# Maps to FTP indices: 0=pinky, 1=ring, 2=middle, 3=index, 4=thumb_bend, 5=thumb_rotation
+target_joint_names:
+  - L_pinky_proximal_joint      # idx 0
+  - L_ring_proximal_joint       # idx 1
+  - L_middle_proximal_joint     # idx 2
+  - L_index_proximal_joint      # idx 3
+  - L_thumb_proximal_pitch_joint  # idx 4 (thumb bend)
+  - L_thumb_proximal_yaw_joint    # idx 5 (thumb rotation)
+
+# Target link names for fingertip positions
+target_link_human_indices:
+  # Format: [link_name, human_hand_joint_index]
+  # Human hand indices follow MANO convention:
+  # 0=wrist, 1-4=thumb, 5-8=index, 9-12=middle, 13-16=ring, 17-20=pinky
+  - [L_pinky_tip, [17, 20]]      # Pinky: base to tip
+  - [L_ring_tip, [13, 16]]       # Ring: base to tip
+  - [L_middle_tip, [9, 12]]      # Middle: base to tip
+  - [L_index_tip, [5, 8]]        # Index: base to tip
+  - [L_thumb_tip, [1, 4]]        # Thumb: base to tip
+
+# For position retargeting: source and target vectors
+target_vector_origin:
+  - L_palm       # All vectors originate from palm
+  - L_palm
+  - L_palm
+  - L_palm
+  - L_palm
+
+source_vector_origin:
+  - wrist        # Human wrist as origin
+  - wrist
+  - wrist
+  - wrist
+  - wrist
+
+# Optimization scaling weights per finger
+finger_weights:
+  pinky: 1.0
+  ring: 1.0
+  middle: 1.0
+  index: 1.0
+  thumb: 1.5      # Higher weight for thumb accuracy
+
+# Low pass filter coefficient for smoothing
+low_pass_alpha: 0.3
+
+# Bounds for the retargeted joint angles (radians)
+joint_limits:
+  L_pinky_proximal_joint: [0, 1.7]
+  L_ring_proximal_joint: [0, 1.7]
+  L_middle_proximal_joint: [0, 1.7]
+  L_index_proximal_joint: [0, 1.7]
+  L_thumb_proximal_pitch_joint: [0, 0.5]
+  L_thumb_proximal_yaw_joint: [-0.1, 1.3]

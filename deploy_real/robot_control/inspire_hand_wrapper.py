@@ -319,9 +319,9 @@ class Inspire_Controller_FTP:
                 else:
                     # Hand tracking mode: use full hand position data
                     with left_hand_array.get_lock():
-                        left_hand_data  = np.array(left_hand_array[:]).reshape(25, 3).copy()
+                        left_hand_data  = np.array(left_hand_array[:]).reshape(26, 3).copy()
                     with right_hand_array.get_lock():
-                        right_hand_data = np.array(right_hand_array[:]).reshape(25, 3).copy()
+                        right_hand_data = np.array(right_hand_array[:]).reshape(26, 3).copy()
                     
                     if not np.all(right_hand_data == 0.0) and not np.all(left_hand_data[4] == np.array([-1.13, 0.3, 0.15])):
                         ref_left_value = left_hand_data[self.hand_retargeting.left_indices[1,:]] - left_hand_data[self.hand_retargeting.left_indices[0,:]]
@@ -361,6 +361,24 @@ class Inspire_Controller_FTP:
                 time.sleep(sleep_time)
         finally:
             logger_mp.info("Inspire_Controller_FTP has been closed.")
+
+    def ctrl_dual_hand(self, left_q_target, right_q_target):
+        """
+        Set left and right hand motor targets. For FTP hands, expects 6 values per hand.
+        Values should be in range [0, 1] where 1.0 = open, 0.0 = closed.
+        
+        FTP DOF order: [pinky, ring, middle, index, thumb_bend, thumb_rotation]
+        """
+        # Convert [0, 1] normalized values to [0, 1000] for FTP command
+        # Input: 1.0 = open, 0.0 = closed
+        # FTP command: 1000 = open, 0 = closed (same direction)
+        left_q_target = np.clip(left_q_target, 0.0, 1.0)
+        right_q_target = np.clip(right_q_target, 0.0, 1.0)
+        
+        left_angle_cmd_scaled = [int(val * 1000) for val in left_q_target]
+        right_angle_cmd_scaled = [int(val * 1000) for val in right_q_target]
+        
+        self._send_hand_command(left_angle_cmd_scaled, right_angle_cmd_scaled)
 
 # Update hand state, according to the official documentation:
 # 1. https://support.unitree.com/home/en/G1_developer/inspire_dfx_dexterous_hand
